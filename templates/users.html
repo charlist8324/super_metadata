@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">用户管理 - Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <!-- 管理员：用户管理界面 -->
+        <div id="adminUserManagement" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 fw-bold mb-1">用户管理</h1>
+                            <p class="text-muted mb-0">管理系统用户和权限</p>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                <i class="fas fa-plus me-1"></i>添加用户
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="usersTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>用户名</th>
+                                            <th>邮箱</th>
+                                            <th>姓名</th>
+                                            <th>角色</th>
+                                            <th>状态</th>
+                                            <th>最后登录</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersList">
+                                        <!-- 动态加载用户列表 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 普通用户：个人中心 -->
+        <div id="userProfile" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">个人中心</h1>
+                        <p class="text-muted mb-0">管理您的个人信息和密码</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">
+                                <i class="fas fa-user-edit text-primary me-2"></i>基本信息
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="profileForm">
+                                <input type="hidden" id="profileUserId">
+                                <div class="mb-3">
+                                    <label for="profileUsername" class="form-label fw-semibold">用户名</label>
+                                    <input type="text" class="form-control" id="profileUsername" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="profileEmail" class="form-label fw-semibold">邮箱</label>
+                                    <input type="email" class="form-control" id="profileEmail" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="profileFullName" class="form-label fw-semibold">姓名</label>
+                                    <input type="text" class="form-control" id="profileFullName">
+                                </div>
+                            </form>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <button type="button" class="btn btn-primary" onclick="updateProfile()">
+                                <i class="fas fa-save me-1"></i>保存更改
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">
+                                <i class="fas fa-key text-warning me-2"></i>修改密码
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="passwordForm">
+                                <div class="mb-3">
+                                    <label for="currentPassword" class="form-label fw-semibold">当前密码 <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="currentPassword" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="newPassword" class="form-label fw-semibold">新密码 <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="newPassword" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="confirmPassword" class="form-label fw-semibold">确认新密码 <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="confirmPassword" required>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <button type="button" class="btn btn-warning" onclick="changePassword()">
+                                <i class="fas fa-key me-1"></i>修改密码
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑用户模态框 -->
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="userModalTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="userModalTitle">
+                        <i class="fas fa-user-plus me-2"></i>
+                        <span>添加用户</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="userForm">
+                        <input type="hidden" id="userId">
+                        <div class="mb-3">
+                            <label for="username" class="form-label fw-semibold">用户名 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="username" placeholder="请输入用户名" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label fw-semibold">邮箱 <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="email" placeholder="请输入邮箱地址" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label fw-semibold">姓名</label>
+                            <input type="text" class="form-control" id="full_name" placeholder="请输入姓名">
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label fw-semibold">密码 <span class="text-danger" id="passwordRequired">*</span></label>
+                            <input type="password" class="form-control" id="password" placeholder="请输入密码">
+                            <div class="form-text" id="passwordHint">编辑时留空表示不修改密码</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="role" class="form-label fw-semibold">角色 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="role" required>
+                                <option value="user">普通用户</option>
+                                <option value="admin">管理员</option>
+                                <option value="viewer">只读用户</option>
+                            </select>
+                        </div>
+                        <div class="mb-3" id="statusField" style="display: none;">
+                            <label for="is_active" class="form-label fw-semibold">状态</label>
+                            <select class="form-select" id="is_active">
+                                <option value="1">启用</option>
+                                <option value="0">禁用</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>取消
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveUser()">
+                        <i class="fas fa-save me-1"></i>保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let currentUser = null;
+
+        // 页面加载完成后
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+        });
+
+        // 检查用户登录状态
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    currentUser = userData;
+                    showUserMenu(userData);
+
+                    // 根据用户角色显示不同界面
+                    if (userData.role === 'admin') {
+                        document.getElementById('pageTitle').textContent = '用户管理 - Super MetaData 元数据管理系统';
+                        document.getElementById('adminUserManagement').style.display = 'block';
+                        loadUsers();
+                    } else {
+                        document.getElementById('pageTitle').textContent = '个人中心 - Super MetaData 元数据管理系统';
+                        document.getElementById('userProfile').style.display = 'block';
+                        loadProfile();
+                    }
+                } else {
+                    showLoginMenu();
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                showLoginMenu();
+            }
+        }
+
+        // 显示用户菜单
+        function showUserMenu(userData) {
+            document.getElementById('usernameDisplay').textContent = userData.full_name || userData.username;
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.remove('d-none');
+            document.getElementById('loginMenu').classList.add('d-none');
+        }
+
+        // 加载个人信息
+        async function loadProfile() {
+            if (!currentUser) return;
+
+            document.getElementById('profileUserId').value = currentUser.id;
+            document.getElementById('profileUsername').value = currentUser.username;
+            document.getElementById('profileEmail').value = currentUser.email;
+            document.getElementById('profileFullName').value = currentUser.full_name || '';
+        }
+
+        // 更新个人信息
+        async function updateProfile() {
+            const userId = document.getElementById('profileUserId').value;
+            const email = document.getElementById('profileEmail').value;
+            const fullName = document.getElementById('profileFullName').value;
+
+            if (!email) {
+                alert('邮箱不能为空');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        full_name: fullName
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('个人信息更新成功！');
+                    // 重新加载用户信息
+                    const userResponse = await fetch('/api/current-user');
+                    if (userResponse.ok) {
+                        currentUser = await userResponse.json();
+                        showUserMenu(currentUser);
+                    }
+                } else {
+                    alert('更新失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('更新个人信息失败:', error);
+                alert('更新个人信息失败: ' + error.message);
+            }
+        }
+
+        // 修改密码
+        async function changePassword() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                alert('所有字段都必须填写');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                alert('新密码长度至少为6位');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                alert('两次输入的新密码不一致');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('密码修改成功！请重新登录');
+                    // 清空表单
+                    document.getElementById('passwordForm').reset();
+                    // 跳转到登录页面
+                    window.location.href = '/login';
+                } else {
+                    alert('修改失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('修改密码失败:', error);
+                alert('修改密码失败: ' + error.message);
+            }
+        }
+
+        // 显示登录菜单
+        function showLoginMenu() {
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.add('d-none');
+            document.getElementById('loginMenu').classList.remove('d-none');
+        }
+
+        // 加载用户列表
+        async function loadUsers() {
+            try {
+                const tbody = document.getElementById('usersList');
+                if (!tbody) return;
+
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></td></tr>';
+
+                const response = await fetch('/api/users');
+                if (!response.ok) {
+                    throw new Error('加载用户列表失败');
+                }
+                const users = await response.json();
+
+                tbody.innerHTML = '';
+
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">暂无用户数据</td></tr>';
+                    return;
+                }
+
+                users.forEach(user => {
+                    const row = document.createElement('tr');
+                    
+                    // 角色显示
+                    let roleBadge = '';
+                    switch(user.role) {
+                        case 'admin':
+                            roleBadge = '<span class="badge bg-danger">管理员</span>';
+                            break;
+                        case 'user':
+                            roleBadge = '<span class="badge bg-primary">普通用户</span>';
+                            break;
+                        case 'viewer':
+                            roleBadge = '<span class="badge bg-secondary">只读用户</span>';
+                            break;
+                        default:
+                            roleBadge = `<span class="badge bg-info">${user.role}</span>`;
+                    }
+                    
+                    // 状态显示
+                    const statusBadge = user.is_active 
+                        ? '<span class="badge bg-success">启用</span>' 
+                        : '<span class="badge bg-secondary">禁用</span>';
+                    
+                    // 最后登录时间
+                    const lastLogin = user.last_login 
+                        ? new Date(user.last_login).toLocaleString() 
+                        : '从未登录';
+
+                    row.innerHTML = `
+                        <td>${user.id}</td>
+                        <td>${user.username}</td>
+                        <td>${user.email}</td>
+                        <td>${user.full_name || '-'}</td>
+                        <td>${roleBadge}</td>
+                        <td>${statusBadge}</td>
+                        <td>${lastLogin}</td>
+                        <td class="operations">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser(${user.id})">
+                                <i class="fas fa-edit"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})" ${user.username === 'admin' ? 'disabled' : ''}>
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('加载用户失败:', error);
+                const tbody = document.getElementById('usersList');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${error.message}</td></tr>`;
+                }
+            }
+        }
+
+        // 编辑用户
+        async function editUser(id) {
+            try {
+                const response = await fetch(`/api/users/${id}`);
+                if (!response.ok) {
+                    throw new Error('获取用户信息失败');
+                }
+                const user = await response.json();
+
+                document.getElementById('userId').value = user.id;
+                document.getElementById('username').value = user.username;
+                document.getElementById('email').value = user.email;
+                document.getElementById('full_name').value = user.full_name || '';
+                document.getElementById('password').value = '';
+                document.getElementById('role').value = user.role;
+                document.getElementById('is_active').value = user.is_active ? '1' : '0';
+
+                // 编辑模式：显示状态字段，隐藏密码必填标记
+                document.getElementById('statusField').style.display = 'block';
+                document.getElementById('passwordRequired').style.display = 'none';
+                document.getElementById('passwordHint').style.display = 'block';
+                document.getElementById('password').removeAttribute('required');
+                document.getElementById('username').setAttribute('readonly', '');
+
+                document.getElementById('userModalTitle').innerHTML = '<i class="fas fa-user-edit me-2"></i><span>编辑用户</span>';
+
+                const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
+                modal.show();
+            } catch (error) {
+                console.error('获取用户信息失败:', error);
+                alert('获取用户信息失败: ' + error.message);
+            }
+        }
+
+        // 保存用户
+        async function saveUser() {
+            const id = document.getElementById('userId').value;
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/users/${id}` : '/api/users';
+
+            const userData = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                full_name: document.getElementById('full_name').value,
+                role: document.getElementById('role').value
+            };
+
+            // 如果是新建用户或密码不为空，则包含密码
+            const password = document.getElementById('password').value;
+            if (!id && !password) {
+                alert('请输入密码');
+                return;
+            }
+            if (password) {
+                userData.password = password;
+            }
+
+            // 如果是编辑模式，包含状态
+            if (id) {
+                userData.is_active = document.getElementById('is_active').value === '1';
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(result.message || (id ? '用户更新成功！' : '用户添加成功！'));
+
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addUserModal'));
+                    modal.hide();
+
+                    // 重置表单
+                    resetUserForm();
+
+                    // 刷新列表
+                    loadUsers();
+                } else {
+                    alert('保存失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存用户失败:', error);
+                alert('保存用户失败: ' + error.message);
+            }
+        }
+
+        // 删除用户
+        async function deleteUser(id) {
+            if (!confirm('确定要删除这个用户吗？此操作不可恢复！')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/users/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(result.message || '用户删除成功！');
+                    loadUsers(); // 刷新列表
+                } else {
+                    alert('删除失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('删除用户失败:', error);
+                alert('删除用户失败: ' + error.message);
+            }
+        }
+
+        // 重置用户表单
+        function resetUserForm() {
+            document.getElementById('userForm').reset();
+            document.getElementById('userId').value = '';
+            document.getElementById('userModalTitle').innerHTML = '<i class="fas fa-user-plus me-2"></i><span>添加用户</span>';
+            document.getElementById('statusField').style.display = 'none';
+            document.getElementById('passwordRequired').style.display = 'inline';
+            document.getElementById('passwordHint').style.display = 'none';
+            document.getElementById('password').setAttribute('required', '');
+            document.getElementById('username').removeAttribute('readonly');
+        }
+
+        // 模态框关闭时重置表单
+        document.getElementById('addUserModal').addEventListener('hidden.bs.modal', function () {
+            resetUserForm();
+        });
+
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('退出登录失败');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('退出登录失败');
+            }
+        }
+
+        // 显示用户信息
+        function showUserInfo() {
+            alert('功能开发中：显示用户详细信息');
+        }
+    </script>
+</body>
+</html>

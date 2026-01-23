@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表详情 - Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item" id="userManageNav">
+                        <a class="nav-link" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-2">
+                                <li class="breadcrumb-item"><a href="/metadata">元数据浏览</a></li>
+                                <li class="breadcrumb-item active" aria-current="page">表详情</li>
+                            </ol>
+                        </nav>
+                        <h1 class="h3 fw-bold mb-1" id="tableTitle">表详情</h1>
+                    </div>
+                    <a href="/metadata" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4" id="tableInfoSection">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                     <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle text-primary me-2"></i>基本信息
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <td class="w-25 fw-bold">表名</td>
+                                        <td id="detailTableName">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="w-25 fw-bold">模式</td>
+                                        <td id="detailSchemaName">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="w-25 fw-bold">行数</td>
+                                        <td id="detailRowCount">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="w-25 fw-bold">数据量</td>
+                                        <td id="detailSizeBytes">-</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <td class="w-25 fw-bold">注释</td>
+                                        <td id="detailComment">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="w-25 fw-bold">创建时间</td>
+                                        <td id="detailCreatedAt">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="w-25 fw-bold">更新时间</td>
+                                        <td id="detailUpdatedAt">-</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                     <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list text-primary me-2"></i>字段列表
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-primary" id="editColumnsBtn" onclick="toggleEditMode()" style="display: none;">
+                                <i class="fas fa-edit me-1"></i>编辑注释
+                            </button>
+                            <button class="btn btn-sm btn-success" id="saveColumnsBtn" onclick="saveColumnComments()" style="display: none;">
+                                <i class="fas fa-save me-1"></i>保存注释
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" id="cancelEditBtn" onclick="toggleEditMode()" style="display: none;">
+                                <i class="fas fa-times me-1"></i>取消
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                             <table class="table table-striped" id="columnsTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>字段名</th>
+                                        <th>字段类型</th>
+                                        <th>字段长度</th>
+                                        <th>是否可空</th>
+                                        <th>默认值</th>
+                                        <th>位置</th>
+                                        <th>注释</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="columnsList">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">加载中...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/table_details.js') }}"></script>
+    <script>
+        const tableId = {{ table_id }};
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            loadTableDetails(tableId);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,897 @@
+import abc
+from typing import List, Dict, Any
+from sqlalchemy import create_engine, text
+from models import DataSource, TableMetadata, ColumnMetadata, ExtractionHistory
+from db_config import get_connection_string
+from exceptions import DatabaseConnectionException, ExtractionException
+import logging
+
+
+class MetadataExtractorBase(abc.ABC):
+    """
+    元数据抽取器基类
+    定义通用的元数据抽取接口
+    """
+    
+    def __init__(self, datasource: DataSource):
+        self.datasource = datasource
+        self.connection = None
+        self.engine = None
+        
+    def connect(self):
+        """连接到数据源"""
+        try:
+            connection_string = get_connection_string(
+                db_type=self.datasource.type,
+                host=self.datasource.host,
+                port=self.datasource.port,
+                username=self.datasource.username,
+                password=self.datasource.password,
+                database=self.datasource.database
+            )
+            
+            self.engine = create_engine(connection_string)
+            self.connection = self.engine.connect()
+            return True
+        except Exception as e:
+            logging.error(f"连接数据库失败: {str(e)}")
+            raise DatabaseConnectionException(f"连接数据库失败: {str(e)}")
+    
+    def disconnect(self):
+        """断开连接"""
+        try:
+            if self.connection:
+                self.connection.close()
+            if self.engine:
+                self.engine.dispose()
+        except Exception as e:
+            logging.error(f"断开数据库连接失败: {str(e)}")
+    
+    @abc.abstractmethod
+    def get_table_list(self) -> List[str]:
+        """
+        获取数据库中所有表的列表
+        :return: 表名列表
+        """
+        pass
+    
+    @abc.abstractmethod
+    def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
+        """
+        获取指定表的元数据信息
+        :param table_name: 表名
+        :return: 包含表元数据的字典
+        """
+        pass
+    
+    @abc.abstractmethod
+    def get_column_metadata(self, table_name: str) -> List[Dict[str, Any]]:
+        """
+        获取指定表的列元数据信息
+        :param table_name: 表名
+        :return: 包含列元数据的字典列表
+        """
+        pass
+    
+    @abc.abstractmethod
+    def get_row_count(self, table_name: str) -> int:
+        """
+        获取表的行数
+        :param table_name: 表名
+        :return: 行数
+        """
+        pass
+    
+    @abc.abstractmethod
+    def get_table_size(self, table_name: str) -> int:
+        """
+        获取表的数据大小（字节）
+        :param table_name: 表名
+        :return: 数据大小（字节）
+        """
+        pass
+    
+    @abc.abstractmethod
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        """
+        获取表之间的关联关系
+        :return: 包含表关联关系的字典列表
+        """
+        pass
+
+    def get_table_update_time(self, table_name: str) -> str:
+        """
+        获取表的更新时间（用于增量抽取）
+        :param table_name: 表名
+        :return: 更新时间字符串
+        """
+        return None
+
+    def extract_all_metadata(self) -> Dict[str, Any]:
+        """
+        抽取所有表的元数据（全量抽取）
+        :return: 包含所有元数据的字典
+        """
+        return self.extract_metadata(full=True, include_stats=True)
+
+    def extract_incremental_metadata(self, last_sync_time: str = None) -> Dict[str, Any]:
+        """
+        增量抽取元数据（只抽取新增或变更的表）
+        :param last_sync_time: 上次同步时间
+        :return: 包含元数据的字典
+        """
+        return self.extract_metadata(full=False, include_stats=True, last_sync_time=last_sync_time)
+
+    def extract_schema_only_metadata(self) -> Dict[str, Any]:
+        """
+        仅抽取表结构元数据（不统计行数和数据大小）
+        :return: 包含表结构元数据的字典
+        """
+        return self.extract_metadata(full=True, include_stats=False)
+
+    def extract_metadata(self, full: bool = True, include_stats: bool = True, last_sync_time: str = None) -> Dict[str, Any]:
+        """
+        通用的元数据抽取方法
+        :param full: 是否全量抽取
+        :param include_stats: 是否包含统计信息（行数、大小）
+        :param last_sync_time: 上次同步时间（用于增量抽取）
+        :return: 包含元数据的字典
+        """
+        try:
+            if not self.connect():
+                return {"status": "failed", "message": "无法连接到数据库"}
+
+            tables_data = []
+            table_names = self.get_table_list()
+
+            for table_name in table_names:
+                # 增量抽取：检查表是否变更
+                if not full and last_sync_time:
+                    update_time = self.get_table_update_time(table_name)
+                    if not update_time or str(update_time) <= str(last_sync_time):
+                        continue  # 跳过未变更的表
+
+                table_meta = self.get_table_metadata(table_name)
+                column_meta = self.get_column_metadata(table_name)
+
+                # 根据参数决定是否添加统计信息
+                if include_stats:
+                    table_meta['row_count'] = self.get_row_count(table_name)
+                    table_meta['size_bytes'] = self.get_table_size(table_name)
+                else:
+                    table_meta['row_count'] = 0
+                    table_meta['size_bytes'] = 0
+
+                table_data = {
+                    "table_info": table_meta,
+                    "columns": column_meta
+                }
+                tables_data.append(table_data)
+
+            # 获取表关联关系（只有全量抽取才获取）
+            if full:
+                relationships = self.get_table_relationships()
+            else:
+                relationships = []
+
+            result = {
+                "status": "success",
+                "datasource_id": self.datasource.id,
+                "tables_count": len(tables_data),
+                "tables": tables_data,
+                "relationships": relationships,
+                "extraction_type": "full" if full else "incremental"
+            }
+
+            return result
+
+        except Exception as e:
+            logging.error(f"抽取元数据失败: {str(e)}")
+            return {"status": "failed", "message": str(e)}
+        finally:
+            self.disconnect()
+
+
+class MySQLMetadataExtractor(MetadataExtractorBase):
+    """
+    MySQL元数据抽取器
+    """
+    
+    def get_table_list(self) -> List[str]:
+        query = text("""
+            SELECT TABLE_NAME 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_TYPE = 'BASE TABLE'
+        """)
+        
+        result = self.connection.execute(query, {"database_name": self.datasource.database})
+        return [row[0] for row in result.fetchall()]
+    
+    def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
+        query = text("""
+            SELECT 
+                TABLE_COMMENT AS comment
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+        """)
+        
+        result = self.connection.execute(query, {
+            "database_name": self.datasource.database,
+            "table_name": table_name
+        }).fetchone()
+        
+        comment = result.comment if result else ""
+        
+        return {
+            "table_name": table_name,
+            "schema_name": self.datasource.database,
+            "comment": comment
+        }
+    
+    def get_column_metadata(self, table_name: str) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT 
+                COLUMN_NAME,
+                DATA_TYPE,
+                IS_NULLABLE,
+                COLUMN_DEFAULT,
+                ORDINAL_POSITION,
+                COLUMN_COMMENT
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+            ORDER BY ORDINAL_POSITION
+        """)
+        
+        result = self.connection.execute(query, {
+            "database_name": self.datasource.database,
+            "table_name": table_name
+        })
+        
+        columns = []
+        for row in result:
+            columns.append({
+                "column_name": row.COLUMN_NAME,
+                "data_type": row.DATA_TYPE,
+                "is_nullable": row.IS_NULLABLE,
+                "default_value": row.COLUMN_DEFAULT,
+                "ordinal_position": row.ORDINAL_POSITION,
+                "column_comment": row.COLUMN_COMMENT
+            })
+        
+        return columns
+    
+    def get_row_count(self, table_name: str) -> int:
+        query = text(f"SELECT COUNT(*) FROM `{self.datasource.database}`.`{table_name}`")
+        try:
+            result = self.connection.execute(query).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 行数失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_size(self, table_name: str) -> int:
+        query = text("""
+            SELECT 
+                (DATA_LENGTH + INDEX_LENGTH) AS size_bytes
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+        """)
+        
+        try:
+            result = self.connection.execute(query, {
+                "database_name": self.datasource.database,
+                "table_name": table_name
+            }).fetchone()
+            return result.size_bytes if result and result.size_bytes else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 大小失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT
+                CONSTRAINT_NAME,
+                TABLE_NAME,
+                COLUMN_NAME,
+                REFERENCED_TABLE_NAME,
+                REFERENCED_COLUMN_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE REFERENCED_TABLE_SCHEMA = :database_name
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        """)
+
+        result = self.connection.execute(query, {
+            "database_name": self.datasource.database
+        })
+
+        relationships = []
+        for row in result:
+            relationships.append({
+                "constraint_name": row.CONSTRAINT_NAME,
+                "table_name": row.TABLE_NAME,
+                "column_name": row.COLUMN_NAME,
+                "referenced_table_name": row.REFERENCED_TABLE_NAME,
+                "referenced_column_name": row.REFERENCED_COLUMN_NAME,
+                "constraint_type": "FOREIGN KEY"
+            })
+
+        return relationships
+
+    def get_table_update_time(self, table_name: str) -> str:
+        """获取表的更新时间"""
+        query = text("""
+            SELECT UPDATE_TIME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+        """)
+        try:
+            result = self.connection.execute(query, {
+                "database_name": self.datasource.database,
+                "table_name": table_name
+            }).fetchone()
+            return str(result.UPDATE_TIME) if result and result.UPDATE_TIME else None
+        except Exception:
+            return None
+
+
+class PostgreSQLMetadataExtractor(MetadataExtractorBase):
+    """
+    PostgreSQL元数据抽取器
+    """
+    
+    def get_table_list(self) -> List[str]:
+        query = text("""
+            SELECT tablename 
+            FROM pg_tables 
+            WHERE schemaname = 'public'
+        """)
+        
+        result = self.connection.execute(query)
+        return [row[0] for row in result.fetchall()]
+    
+    def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
+        query = text("""
+            SELECT obj_description(c.oid) AS comment
+            FROM pg_class c
+            JOIN pg_namespace n ON c.relnamespace = n.oid
+            WHERE c.relname = :table_name
+            AND n.nspname = 'public'
+        """)
+        
+        result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+        comment = result.comment if result else ""
+        
+        return {
+            "table_name": table_name,
+            "schema_name": "public",
+            "comment": comment
+        }
+    
+    def get_column_metadata(self, table_name: str) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT 
+                column_name,
+                data_type,
+                is_nullable,
+                column_default,
+                ordinal_position,
+                col_description((SELECT c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE c.relname = :table_name AND n.nspname = 'public'), ordinal_position) AS column_comment
+            FROM information_schema.columns
+            WHERE table_name = :table_name
+            AND table_schema = 'public'
+            ORDER BY ordinal_position
+        """)
+        
+        result = self.connection.execute(query, {"table_name": table_name})
+        
+        columns = []
+        for row in result:
+            columns.append({
+                "column_name": row.column_name,
+                "data_type": row.data_type,
+                "is_nullable": row.is_nullable,
+                "default_value": row.column_default,
+                "ordinal_position": row.ordinal_position,
+                "column_comment": row.column_comment
+            })
+        
+        return columns
+    
+    def get_row_count(self, table_name: str) -> int:
+        query = text(f"SELECT COUNT(*) FROM public.{table_name}")
+        try:
+            result = self.connection.execute(query).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 行数失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_size(self, table_name: str) -> int:
+        query = text(f"SELECT pg_total_relation_size('{table_name}') AS size_bytes")
+        
+        try:
+            result = self.connection.execute(query).fetchone()
+            return result.size_bytes if result and result.size_bytes else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 大小失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        # PostgreSQL中获取外键关系的查询
+        query = text("""
+            SELECT
+                tc.constraint_name,
+                tc.table_name,
+                kcu.column_name,
+                ccu.table_name AS referenced_table_name,
+                ccu.column_name AS referenced_column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+              AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage ccu
+              ON ccu.constraint_name = tc.constraint_name
+              AND ccu.table_schema = tc.table_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+            AND tc.table_schema = 'public'
+        """)
+
+        result = self.connection.execute(query)
+
+        relationships = []
+        for row in result:
+            relationships.append({
+                "constraint_name": row.constraint_name,
+                "table_name": row.table_name,
+                "column_name": row.column_name,
+                "referenced_table_name": row.referenced_table_name,
+                "referenced_column_name": row.referenced_column_name,
+                "constraint_type": "FOREIGN KEY"
+            })
+
+        return relationships
+
+    def get_table_update_time(self, table_name: str) -> str:
+        """获取表的更新时间"""
+        query = text("""
+            SELECT stats.update_time
+            FROM pg_stat_all_tables stats
+            JOIN pg_class c ON stats.relid = c.oid
+            JOIN pg_namespace n ON c.relnamespace = n.oid
+            WHERE c.relname = :table_name
+            AND n.nspname = 'public'
+        """)
+        try:
+            result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+            return str(result.update_time) if result and result.update_time else None
+        except Exception:
+            return None
+
+
+class SQLServerMetadataExtractor(MetadataExtractorBase):
+    """
+    SQL Server元数据抽取器
+    """
+    
+    def get_table_list(self) -> List[str]:
+        query = text("""
+            SELECT TABLE_NAME 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_TYPE = 'BASE TABLE'
+            AND TABLE_SCHEMA = 'dbo'
+        """)
+        
+        result = self.connection.execute(query)
+        return [row[0] for row in result.fetchall()]
+    
+    def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
+        query = text("""
+            SELECT value AS comment
+            FROM sys.extended_properties ep
+            INNER JOIN sys.tables t ON ep.major_id = t.object_id
+            INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE s.name = 'dbo'
+            AND t.name = :table_name
+            AND ep.name = 'MS_Description'
+        """)
+        
+        result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+        comment = result.comment if result else ""
+        
+        return {
+            "table_name": table_name,
+            "schema_name": "dbo",
+            "comment": comment
+        }
+    
+    def get_column_metadata(self, table_name: str) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT 
+                COLUMN_NAME,
+                DATA_TYPE,
+                IS_NULLABLE,
+                COLUMN_DEFAULT,
+                ORDINAL_POSITION,
+                CAST(ep.value AS NVARCHAR(MAX)) AS column_comment
+            FROM INFORMATION_SCHEMA.COLUMNS c
+            LEFT JOIN sys.extended_properties ep ON OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) = ep.major_id
+                AND c.ORDINAL_POSITION = ep.minor_id
+                AND ep.name = 'MS_Description'
+            WHERE c.TABLE_NAME = :table_name
+            AND c.TABLE_SCHEMA = 'dbo'
+            ORDER BY ORDINAL_POSITION
+        """)
+        
+        result = self.connection.execute(query, {"table_name": table_name})
+        
+        columns = []
+        for row in result:
+            columns.append({
+                "column_name": row.COLUMN_NAME,
+                "data_type": row.DATA_TYPE,
+                "is_nullable": row.IS_NULLABLE,
+                "default_value": row.COLUMN_DEFAULT,
+                "ordinal_position": row.ORDINAL_POSITION,
+                "column_comment": row.column_comment
+            })
+        
+        return columns
+    
+    def get_row_count(self, table_name: str) -> int:
+        query = text(f"SELECT COUNT(*) FROM dbo.{table_name}")
+        try:
+            result = self.connection.execute(query).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 行数失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_size(self, table_name: str) -> int:
+        query = text(f"""
+            SELECT SUM(a.total_pages) * 8 * 1024 AS size_bytes
+            FROM sys.tables t
+            INNER JOIN sys.indexes i ON t.OBJECT_ID = i.object_id
+            INNER JOIN sys.partitions p ON i.object_id = p.OBJECT_ID AND i.index_id = p.index_id
+            INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id
+            WHERE t.NAME = :table_name
+            AND t.is_ms_shipped = 0
+        """)
+        
+        try:
+            result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+            return result.size_bytes if result and result.size_bytes else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 大小失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT
+                fk.name AS constraint_name,
+                t1.name AS table_name,
+                c1.name AS column_name,
+                t2.name AS referenced_table_name,
+                c2.name AS referenced_column_name
+            FROM sys.foreign_keys fk
+            INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+            INNER JOIN sys.tables t1 ON fk.parent_object_id = t1.object_id
+            INNER JOIN sys.columns c1 ON fkc.parent_object_id = c1.object_id AND fkc.parent_column_id = c1.column_id
+            INNER JOIN sys.tables t2 ON fk.referenced_object_id = t2.object_id
+            INNER JOIN sys.columns c2 ON fkc.referenced_object_id = c2.object_id AND fkc.referenced_column_id = c2.column_id
+            WHERE t1.schema_id = SCHEMA_ID('dbo')
+            AND t2.schema_id = SCHEMA_ID('dbo')
+        """)
+
+        result = self.connection.execute(query)
+
+        relationships = []
+        for row in result:
+            relationships.append({
+                "constraint_name": row.constraint_name,
+                "table_name": row.table_name,
+                "column_name": row.column_name,
+                "referenced_table_name": row.referenced_table_name,
+                "referenced_column_name": row.referenced_column_name,
+                "constraint_type": "FOREIGN KEY"
+            })
+
+        return relationships
+
+    def get_table_update_time(self, table_name: str) -> str:
+        """获取表的更新时间"""
+        query = text("""
+            SELECT STATS_DATE(OBJECT_ID(:table_name), STATS_ID(OBJECT_ID(:table_name))) AS update_time
+        """)
+        try:
+            result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+            return str(result.update_time) if result and result.update_time else None
+        except Exception:
+            return None
+
+
+class OracleMetadataExtractor(MetadataExtractorBase):
+    """
+    Oracle元数据抽取器
+    """
+    
+    def get_table_list(self) -> List[str]:
+        query = text("""
+            SELECT table_name 
+            FROM user_tables
+        """)
+        
+        result = self.connection.execute(query)
+        return [row[0].lower() for row in result.fetchall()]
+    
+    def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
+        query = text("""
+            SELECT comments
+            FROM user_tab_comments
+            WHERE table_name = UPPER(:table_name)
+        """)
+        
+        result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+        comment = result.comments if result else ""
+        
+        return {
+            "table_name": table_name.lower(),
+            "schema_name": self.datasource.username.upper(),
+            "comment": comment
+        }
+    
+    def get_column_metadata(self, table_name: str) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT 
+                column_name,
+                data_type,
+                CASE nullable WHEN 'Y' THEN 'YES' ELSE 'NO' END AS is_nullable,
+                data_default AS column_default,
+                column_id AS ordinal_position,
+                comments AS column_comment
+            FROM user_col_comments
+            WHERE table_name = UPPER(:table_name)
+            ORDER BY column_id
+        """)
+        
+        result = self.connection.execute(query, {"table_name": table_name})
+        
+        columns = []
+        for row in result:
+            columns.append({
+                "column_name": row.column_name.lower(),
+                "data_type": row.data_type,
+                "is_nullable": row.is_nullable,
+                "default_value": row.column_default,
+                "ordinal_position": row.ordinal_position,
+                "column_comment": row.column_comment
+            })
+        
+        return columns
+    
+    def get_row_count(self, table_name: str) -> int:
+        query = text(f"SELECT COUNT(*) FROM {self.datasource.username.upper()}.{table_name.upper()}")
+        try:
+            result = self.connection.execute(query).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 行数失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_size(self, table_name: str) -> int:
+        query = text("""
+            SELECT bytes
+            FROM user_segments
+            WHERE segment_name = UPPER(:table_name)
+            AND segment_type = 'TABLE'
+        """)
+        
+        try:
+            result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+            return result.bytes if result and result.bytes else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 大小失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT
+                constraint_name,
+                table_name,
+                column_name,
+                r_constraint_name,
+                r_owner,
+                r_table_name AS referenced_table_name,
+                r_column_name AS referenced_column_name
+            FROM user_constraints
+            WHERE constraint_type = 'R'
+        """)
+
+        result = self.connection.execute(query)
+
+        relationships = []
+        for row in result:
+            relationships.append({
+                "constraint_name": row.constraint_name,
+                "table_name": row.table_name.lower(),
+                "column_name": row.column_name.lower(),
+                "referenced_table_name": row.referenced_table_name.lower(),
+                "referenced_column_name": row.referenced_column_name.lower(),
+                "constraint_type": "FOREIGN KEY"
+            })
+
+        return relationships
+
+    def get_table_update_time(self, table_name: str) -> str:
+        """获取表的更新时间"""
+        query = text("""
+            SELECT last_ddl_time
+            FROM user_objects
+            WHERE object_name = UPPER(:table_name)
+            AND object_type = 'TABLE'
+        """)
+        try:
+            result = self.connection.execute(query, {"table_name": table_name}).fetchone()
+            return str(result.last_ddl_time) if result and result.last_ddl_time else None
+        except Exception:
+            return None
+
+class StarRocksMetadataExtractor(MySQLMetadataExtractor):
+    """
+    StarRocks元数据抽取器
+    StarRocks是基于MySQL协议的MPP数据库，可以复用MySQL的大部分逻辑
+    """
+    
+    def get_table_list(self) -> List[str]:
+        """获取StarRocks中所有表的列表"""
+        query = text("""
+            SELECT TABLE_NAME 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_TYPE = 'BASE TABLE'
+        """)
+        
+        result = self.connection.execute(query, {"database_name": self.datasource.database})
+        return [row[0] for row in result.fetchall()]
+    
+    def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
+        """获取指定表的元数据"""
+        query = text("""
+            SELECT 
+                TABLE_COMMENT AS comment
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+        """)
+        
+        result = self.connection.execute(query, {
+            "database_name": self.datasource.database,
+            "table_name": table_name
+        }).fetchone()
+        
+        comment = result.TABLE_COMMENT if result else ""
+        
+        return {
+            "table_name": table_name,
+            "schema_name": self.datasource.database,
+            "comment": comment
+        }
+    
+    def get_column_metadata(self, table_name: str) -> List[Dict[str, Any]]:
+        """获取指定表的列元数据信息"""
+        query = text("""
+            SELECT 
+                COLUMN_NAME,
+                DATA_TYPE,
+                IS_NULLABLE,
+                COLUMN_DEFAULT,
+                ORDINAL_POSITION,
+                COLUMN_COMMENT
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+            ORDER BY ORDINAL_POSITION
+        """)
+        
+        result = self.connection.execute(query, {
+            "database_name": self.datasource.database,
+            "table_name": table_name
+        })
+        
+        columns = []
+        for row in result:
+            columns.append({
+                "column_name": row.COLUMN_NAME,
+                "data_type": row.DATA_TYPE,
+                "is_nullable": row.IS_NULLABLE,
+                "default_value": row.COLUMN_DEFAULT,
+                "ordinal_position": row.ORDINAL_POSITION,
+                "column_comment": row.COLUMN_COMMENT
+            })
+        
+        return columns
+    
+    def get_row_count(self, table_name: str) -> int:
+        """获取表的行数"""
+        # StarRocks使用MySQL语法，可以用SELECT COUNT(*)
+        query = text(f"SELECT COUNT(*) FROM `{self.datasource.database}`.`{table_name}`")
+        try:
+            result = self.connection.execute(query).fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 行数失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_size(self, table_name: str) -> int:
+        """获取表的数据大小（字节）"""
+        # StarRocks使用MySQL的INFORMATION_SCHEMA
+        query = text("""
+            SELECT 
+                (DATA_LENGTH + INDEX_LENGTH) AS size_bytes
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+        """)
+        
+        try:
+            result = self.connection.execute(query, {
+                "database_name": self.datasource.database,
+                "table_name": table_name
+            }).fetchone()
+            return result.size_bytes if result and result.size_bytes else 0
+        except Exception as e:
+            logging.warning(f"获取表 {table_name} 大小失败: {str(e)}, 返回0")
+            return 0
+    
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        """获取表之间的关联关系（StarRocks兼容MySQL的查询）"""
+        query = text("""
+            SELECT 
+                CONSTRAINT_NAME,
+                TABLE_NAME,
+                COLUMN_NAME,
+                REFERENCED_TABLE_NAME,
+                REFERENCED_COLUMN_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = :database_name
+            AND REFERENCED_TABLE_SCHEMA = :database_name
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        """)
+        
+        result = self.connection.execute(query, {
+            "database_name": self.datasource.database
+        })
+        
+        relationships = []
+        for row in result:
+            relationships.append({
+                "constraint_name": row.CONSTRAINT_NAME,
+                "table_name": row.TABLE_NAME,
+                "column_name": row.COLUMN_NAME,
+                "referenced_table_name": row.REFERENCED_TABLE_NAME,
+                "referenced_column_name": row.REFERENCED_COLUMN_NAME,
+                "constraint_type": "FOREIGN KEY"
+            })
+        
+        return relationships
+    
+    def get_table_update_time(self, table_name: str) -> str:
+        """获取表的更新时间"""
+        query = text("""
+            SELECT UPDATE_TIME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = :database_name
+            AND TABLE_NAME = :table_name
+        """)
+        try:
+            result = self.connection.execute(query, {
+                "database_name": self.datasource.database,
+                "table_name": table_name
+            }).fetchone()
+            return str(result.UPDATE_TIME) if result and result.UPDATE_TIME else None
+        except Exception:
+            return None

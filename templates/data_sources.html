@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据源管理 - Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item" id="userManageNav">
+                        <a class="nav-link" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">数据源管理</h1>
+                        <p class="text-muted mb-0">管理所有连接的数据源</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDataSourceModal">
+                            <i class="fas fa-plus me-1"></i>添加数据源
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="dataSourcesTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>名称</th>
+                                        <th>类型</th>
+                                        <th>主机</th>
+                                        <th>端口</th>
+                                        <th>数据库</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- 动态加载数据源列表 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑数据源模态框 -->
+    <div class="modal fade" id="addDataSourceModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalTitle">
+                        <i class="fas fa-server me-2"></i>
+                        <span>添加数据源</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="dataSourceForm">
+                        <input type="hidden" id="dataSourceId">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label fw-semibold">数据源名称 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="name" placeholder="请输入数据源名称" required>
+                                    <div class="form-text">用于标识此数据源的唯一名称</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="type" class="form-label fw-semibold">数据库类型 <span class="text-danger">*</span></label>
+                                     <select class="form-select" id="type" required>
+                                        <option value="">请选择数据库类型</option>
+                                        <option value="mysql">MySQL</option>
+                                        <option value="postgresql">PostgreSQL</option>
+                                        <option value="sqlserver">SQL Server</option>
+                                        <option value="oracle">Oracle</option>
+                                        <option value="starrocks">StarRocks</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="host" class="form-label fw-semibold">主机地址 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="host" placeholder="例如: localhost 或 IP 地址" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="port" class="form-label fw-semibold">端口 <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="port" placeholder="例如: 3306" min="1" max="65535" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="username" class="form-label fw-semibold">用户名 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="username" placeholder="请输入数据库用户名" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="password" class="form-label fw-semibold">密码 <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="password" placeholder="请输入数据库密码" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="database" class="form-label fw-semibold">数据库名 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="database" placeholder="请输入要连接的数据库名" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>取消
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveDataSource()">
+                        <i class="fas fa-save me-1"></i>保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // 页面加载完成后获取数据源列表
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus().then(() => {
+                loadDataSources();
+            });
+        });
+        
+        // 检查用户登录状态
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    showUserMenu(userData);
+                    return true;
+                } else {
+                    showLoginMenu();
+                    return false;
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                showLoginMenu();
+                return false;
+            }
+        }
+        
+        // 显示用户菜单
+        function showUserMenu(userData) {
+            document.getElementById('usernameDisplay').textContent = userData.full_name || userData.username;
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.remove('d-none');
+            document.getElementById('loginMenu').classList.add('d-none');
+        }
+        
+        // 显示登录菜单
+        function showLoginMenu() {
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.add('d-none');
+            document.getElementById('loginMenu').classList.remove('d-none');
+        }
+        
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('退出登录失败');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('退出登录失败');
+            }
+        }
+        
+        // 显示用户信息
+        function showUserInfo() {
+            alert('功能开发中：显示用户详细信息');
+        }
+    </script>
+</body>
+</html>

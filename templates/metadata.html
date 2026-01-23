@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元数据浏览 - Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item" id="userManageNav">
+                        <a class="nav-link" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">元数据浏览</h1>
+                        <p class="text-muted mb-0">浏览和分析已抽取的表结构和字段信息</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="fas fa-filter text-primary me-2"></i>
+                            筛选条件
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">选择数据源</label>
+                            <select class="form-select" id="dataSourceSelect" onchange="loadTables()">
+                                <option value="">请选择数据源</option>
+                                <!-- 动态加载数据源选项 -->
+                            </select>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            元数据由ETL任务自动抽取，如需更新请到ETL任务页面配置定时任务
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-9">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table text-info me-2"></i>
+                            表列表
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm w-auto">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="tableSearch" placeholder="搜索表名..." onkeyup="filterTables()">
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm" onclick="loadTables()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="tablesTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>表名 <i class="fas fa-sort text-muted ms-1 sort-icon" data-field="table_name"></i></th>
+                                        <th>模式</th>
+                                        <th>行数 <i class="fas fa-sort text-muted ms-1 sort-icon" data-field="row_count"></i></th>
+                                        <th>数据量 <i class="fas fa-sort text-muted ms-1 sort-icon" data-field="size_bytes"></i></th>
+                                        <th>注释</th>
+                                        <th>创建时间 <i class="fas fa-sort text-muted ms-1 sort-icon" data-field="created_at"></i></th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablesList">
+                                    <!-- 动态加载表列表 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- 分页控件 -->
+                    <div class="card-footer bg-light">
+                        <nav aria-label="表列表分页" id="paginationNav" style="display: none;">
+                            <ul class="pagination justify-content-center mb-0" id="paginationList">
+                                <!-- 分页控件 -->
+                            </ul>
+                        </nav>
+                        <div id="paginationInfo" class="text-center text-muted small"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表详情模态框 -->
+        <div class="modal fade" id="tableDetailModal" tabindex="-1" aria-labelledby="tableDetailModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="tableDetailModalLabel">
+                            <i class="fas fa-table me-2"></i>
+                            <span>表详情</span>
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 表基本信息 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>基本信息</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>表名:</strong> <span id="detailTableName"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>模式:</strong> <span id="detailSchemaName"></span>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <strong>行数:</strong> <span id="detailRowCount"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>数据量:</strong> <span id="detailSizeBytes"></span>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <strong>创建时间:</strong> <span id="detailCreatedAt"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>更新时间:</strong> <span id="detailUpdatedAt"></span>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1 me-2">
+                                                <label class="form-label fw-semibold mb-1">注释</label>
+                                                <textarea class="form-control" id="detailComment" rows="3" placeholder="请输入表注释"></textarea>
+                                            </div>
+                                            <div class="mt-4">
+                                                <button class="btn btn-primary btn-sm" onclick="saveTableComment()" title="保存注释">
+                                                    <i class="fas fa-save"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 列信息 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-columns me-2"></i>字段信息</h6>
+                                <div>
+                                    <button class="btn btn-sm btn-primary" id="modalEditColumnsBtn" onclick="toggleModalEditMode()" style="display: none;">
+                                        <i class="fas fa-edit me-1"></i>编辑
+                                    </button>
+                                    <button class="btn btn-sm btn-success" id="modalSaveColumnsBtn" onclick="saveModalColumnComments()" style="display: none;">
+                                        <i class="fas fa-save me-1"></i>保存
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" id="modalCancelEditBtn" onclick="toggleModalEditMode()" style="display: none;">
+                                        <i class="fas fa-times me-1"></i>取消
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>序号</th>
+                                                <th>字段名</th>
+                                                <th>数据类型</th>
+                                                <th>可空</th>
+                                                <th>默认值</th>
+                                                <th>注释</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="detailColumnsList">
+                                            <!-- 动态加载列信息 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 关联关系 -->
+                        <div class="card" id="relationshipsCard">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-link me-2"></i>关联关系</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>类型</th>
+                                                <th>字段名</th>
+                                                <th>关联表</th>
+                                                <th>关联字段</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="detailRelationshipsList">
+                                            <!-- 动态加载关联关系 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>关闭
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let currentPage = 1;
+        let totalPages = 0;
+        let currentSortField = 'table_name';
+        let currentSortOrder = 'asc';
+        let currentDataSourceId = null;
+        let modalEditMode = false;
+        let modalEditedComments = {};
+        let modalOriginalComments = {};
+        let modalCurrentUser = null;
+        
+        // 页面加载完成后获取数据源列表
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            loadDataSourcesForMetadata();
+            
+            // 添加排序图标点击事件
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                icon.addEventListener('click', function() {
+                    const field = this.dataset.field;
+                    handleSort(field);
+                });
+            });
+        });
+        
+        // 加载数据源
+        async function loadDataSourcesForMetadata() {
+            try {
+                const response = await fetch('/api/data-sources');
+                const dataSources = await response.json();
+                
+                const select = document.getElementById('dataSourceSelect');
+                if (!select) return;
+                
+                select.innerHTML = '<option value="">请选择数据源</option>';
+                
+                dataSources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source.id;
+                    option.textContent = `${source.name} (${source.type.toUpperCase()})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('加载数据源失败:', error);
+            }
+        }
+        
+        // 加载表列表
+        async function loadTables() {
+            const dataSourceId = document.getElementById('dataSourceSelect').value;
+            if (!dataSourceId) {
+                clearTables();
+                return;
+            }
+            
+            currentDataSourceId = parseInt(dataSourceId);
+            currentPage = 1;
+            
+            await loadTablesPage(currentPage);
+        }
+        
+        // 加载指定页的表
+        async function loadTablesPage(page) {
+            if (!currentDataSourceId) {
+                clearTables();
+                return;
+            }
+            
+            try {
+                const tbody = document.getElementById('tablesList');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></td></tr>';
+                
+                // 构建请求URL
+                let url = `/api/data-sources/${currentDataSourceId}/tables?page=${page}&per_page=20`;
+                if (currentSortField) {
+                    url += `&sort_by=${currentSortField}`;
+                    url += `&sort_order=${currentSortOrder}`;
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('加载表列表失败');
+                }
+                const result = await response.json();
+                
+                const tables = result.tables;
+                totalPages = result.pagination.pages;
+                currentSortField = result.sort.field;
+                currentSortOrder = result.sort.order;
+                
+                tbody.innerHTML = '';
+                
+                if (tables.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">暂无表数据，请执行ETL任务抽取元数据</td></tr>';
+                    hidePagination();
+                    return;
+                }
+                
+                tables.forEach(table => {
+                    const row = document.createElement('tr');
+                    
+                    // 格式化数据量
+                    const sizeDisplay = formatSize(table.size_bytes);
+                    
+                    // 使用已转换的北京时间
+                    const createdAt = table.created_at_readable || '-';
+                    
+                    row.innerHTML = `
+                        <td>${table.table_name}</td>
+                        <td>${table.schema_name}</td>
+                        <td>${table.row_count.toLocaleString() || '-'}</td>
+                        <td>${sizeDisplay}</td>
+                        <td>${table.comment || '-'}</td>
+                        <td>${createdAt}</td>
+                        <td class="operations">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewTableDetails(${table.id})" title="查看详情">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                // 更新排序图标
+                updateSortIcons();
+                
+                // 更新分页控件
+                updatePagination(page, totalPages);
+            } catch (error) {
+                console.error('加载表列表失败:', error);
+                const tbody = document.getElementById('tablesList');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">加载表列表失败: ${error.message}</td></tr>`;
+                }
+                hidePagination();
+            }
+        }
+        
+        // 清空表列表
+        function clearTables() {
+            const tbody = document.getElementById('tablesList');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">请先选择数据源</td></tr>';
+            }
+            hidePagination();
+        }
+        
+        // 隐藏分页
+        function hidePagination() {
+            const paginationNav = document.getElementById('paginationNav');
+            const paginationInfo = document.getElementById('paginationInfo');
+            if (paginationNav) paginationNav.style.display = 'none';
+            if (paginationInfo) paginationInfo.textContent = '';
+        }
+        
+        // 更新分页控件
+        function updatePagination(page, totalPages) {
+            const paginationNav = document.getElementById('paginationNav');
+            const paginationList = document.getElementById('paginationList');
+            const paginationInfo = document.getElementById('paginationInfo');
+            
+            if (!paginationList || !paginationInfo) return;
+            
+            paginationList.innerHTML = '';
+            
+            if (totalPages <= 1) {
+                paginationNav.style.display = 'none';
+                paginationInfo.textContent = '';
+                return;
+            }
+            
+            paginationNav.style.display = 'block';
+            paginationInfo.textContent = `第 ${page} / ${totalPages} 页`;
+            
+            // 上一页按钮
+            if (page > 1) {
+                const prevLi = document.createElement('li');
+                prevLi.className = 'page-item';
+                prevLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${page - 1})">上一页</a>`;
+                paginationList.appendChild(prevLi);
+            } else {
+                const prevLi = document.createElement('li');
+                prevLi.className = 'page-item disabled';
+                prevLi.innerHTML = `<span class="page-link">上一页</span>`;
+                paginationList.appendChild(prevLi);
+            }
+            
+            // 页码按钮
+            const startPage = Math.max(1, page - 2);
+            const endPage = Math.min(totalPages, page + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = i === page ? 'page-item active' : 'page-item';
+                pageLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>`;
+                paginationList.appendChild(pageLi);
+            }
+            
+            // 下一页按钮
+            if (page < totalPages) {
+                const nextLi = document.createElement('li');
+                nextLi.className = 'page-item';
+                nextLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${page + 1})">下一页</a>`;
+                paginationList.appendChild(nextLi);
+            } else {
+                const nextLi = document.createElement('li');
+                nextLi.className = 'page-item disabled';
+                nextLi.innerHTML = `<span class="page-link">下一页</span>`;
+                paginationList.appendChild(nextLi);
+            }
+        }
+        
+        // 跳转到指定页面
+        function goToPage(page) {
+            currentPage = page;
+            loadTablesPage(page);
+            
+            // 滚动到表格顶部
+            document.querySelector('#tablesTable').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 处理排序
+        function handleSort(field) {
+            if (currentSortField === field) {
+                // 切换排序方向
+                currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                // 新的排序字段，默认升序
+                currentSortField = field;
+                currentSortOrder = 'asc';
+            }
+            
+            // 重新加载数据
+            loadTablesPage(currentPage);
+        }
+        
+        // 更新排序图标
+        function updateSortIcons() {
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                const field = icon.dataset.field;
+                icon.className = 'fas fa-sort text-muted ms-1 sort-icon';
+                
+                if (field === currentSortField) {
+                    if (currentSortOrder === 'asc') {
+                        icon.className = 'fas fa-sort-up text-primary ms-1 sort-icon';
+                    } else {
+                        icon.className = 'fas fa-sort-down text-primary ms-1 sort-icon';
+                    }
+                }
+            });
+        }
+        
+        // 格式化数据量显示
+        function formatSize(bytes) {
+            if (!bytes || bytes === 0) return '-';
+            
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let size = bytes;
+            let unitIndex = 0;
+            
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            
+            return `${size.toFixed(2)} ${units[unitIndex]}`;
+        }
+        
+        // 查看表详情
+        async function viewTableDetails(tableId) {
+            currentTableId = tableId;
+            
+            // 重置编辑模式
+            modalEditMode = false;
+            modalEditedComments = {};
+            modalOriginalComments = {};
+            
+            try {
+                const response = await fetch(`/api/tables/${tableId}`);
+                if (!response.ok) {
+                    throw new Error('获取表详情失败');
+                }
+                const tableData = await response.json();
+                
+                // 填充基本信息
+                document.getElementById('detailTableName').textContent = tableData.table_name;
+                document.getElementById('detailSchemaName').textContent = tableData.schema_name;
+                document.getElementById('detailRowCount').textContent = tableData.row_count ? tableData.row_count.toLocaleString() : '-';
+                
+                // 格式化数据量
+                const sizeDisplay = formatSize(tableData.size_bytes);
+                document.getElementById('detailSizeBytes').textContent = sizeDisplay;
+                
+                // 格式化时间
+                document.getElementById('detailCreatedAt').textContent = tableData.created_at_readable || '-';
+                document.getElementById('detailUpdatedAt').textContent = tableData.updated_at_readable || '-';
+                document.getElementById('detailComment').value = tableData.comment || '';
+                
+                // 填充列信息
+                const columnsList = document.getElementById('detailColumnsList');
+                columnsList.innerHTML = '';
+                
+                if (tableData.columns && tableData.columns.length > 0) {
+                    tableData.columns.forEach(col => {
+                        const row = document.createElement('tr');
+                        row.dataset.columnId = col.id;
+                        
+                        // 根据编辑模式显示不同的注释列
+                        const commentCell = modalEditMode
+                            ? `<input type="text" class="form-control form-control-sm"
+                                       data-column-id="${col.id}"
+                                       value="${col.column_comment || ''}"
+                                       placeholder="输入注释（留空表示删除）"
+                                       onchange="updateModalEditedComment(${col.id}, this.value)">`
+                            : `<span class="comment-display">${col.column_comment || '-'}</span>`;
+                        
+                        row.innerHTML = `
+                            <td>${col.ordinal_position}</td>
+                            <td><strong>${col.column_name}</strong></td>
+                            <td>${col.data_type}</td>
+                            <td>${col.is_nullable ? '<span class="badge bg-success">是</span>' : '<span class="badge bg-danger">否</span>'}</td>
+                            <td>${col.default_value || '-'}</td>
+                            <td>${commentCell}</td>
+                        `;
+                        columnsList.appendChild(row);
+                    });
+                } else {
+                    columnsList.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无字段信息</td></tr>';
+                }
+                
+                // 填充关联关系
+                const relationshipsList = document.getElementById('detailRelationshipsList');
+                relationshipsList.innerHTML = '';
+                
+                if (tableData.relationships && tableData.relationships.length > 0) {
+                    tableData.relationships.forEach(rel => {
+                        const row = document.createElement('tr');
+                        const typeHtml = rel.type === 'outgoing' 
+                            ? '<span class="badge bg-primary">外键</span>'
+                            : '<span class="badge bg-info">被引用</span>';
+                        
+                        const targetTable = rel.type === 'outgoing'
+                            ? rel.referenced_table_name
+                            : rel.referencing_table_name;
+                        
+                        const targetColumn = rel.type === 'outgoing'
+                            ? rel.referenced_column_name
+                            : rel.referencing_column_name;
+                        
+                        row.innerHTML = `
+                            <td>${typeHtml}</td>
+                            <td>${rel.column_name}</td>
+                            <td><strong>${targetTable}</strong></td>
+                            <td>${targetColumn}</td>
+                        `;
+                        relationshipsList.appendChild(row);
+                    });
+                    
+                    // 显示关联关系卡片
+                    document.getElementById('relationshipsCard').style.display = 'block';
+                } else {
+                    relationshipsList.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">暂无关联关系</td></tr>';
+                    document.getElementById('relationshipsCard').style.display = 'none';
+                }
+                
+                // 显示模态框
+                const modalElement = document.getElementById('tableDetailModal');
+                const modal = new bootstrap.Modal(modalElement);
+                
+                // 重置编辑模式状态
+                modalEditMode = false;
+                modalEditedComments = {};
+                modalOriginalComments = {};
+                document.getElementById('modalEditColumnsBtn').style.display = 'none';
+                document.getElementById('modalSaveColumnsBtn').style.display = 'none';
+                document.getElementById('modalCancelEditBtn').style.display = 'none';
+                
+                // 根据用户权限显示编辑按钮
+                if (modalCurrentUser && (modalCurrentUser.role === 'admin' || modalCurrentUser.role === 'user')) {
+                    document.getElementById('modalEditColumnsBtn').style.display = 'inline-block';
+                }
+                
+                // 监听模态框关闭事件，重置编辑模式
+                modalElement.addEventListener('hidden.bs.modal', function() {
+                    modalEditMode = false;
+                    modalEditedComments = {};
+                    modalOriginalComments = {};
+                    document.getElementById('modalEditColumnsBtn').style.display = 'none';
+                    document.getElementById('modalSaveColumnsBtn').style.display = 'none';
+                    document.getElementById('modalCancelEditBtn').style.display = 'none';
+                }, { once: true });
+                
+                modal.show();
+            } catch (error) {
+                console.error('获取表详情失败:', error);
+                alert('获取表详情失败: ' + error.message);
+            }
+        }
+        
+        // 保存表注释
+        async function saveTableComment() {
+            if (!currentTableId) {
+                alert('无法保存：未选择表');
+                return;
+            }
+            
+            const comment = document.getElementById('detailComment').value;
+            
+            try {
+                const response = await fetch(`/api/tables/${currentTableId}/comment`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        comment: comment
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('注释保存成功！');
+                    
+                    // 重新加载表列表以更新注释显示
+                    loadTablesPage(currentPage);
+                } else {
+                    const error = await response.json();
+                    alert('保存失败: ' + (error.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存注释失败:', error);
+                alert('保存注释失败: ' + error.message);
+            }
+        }
+        
+        // 更新模态框编辑的注释
+        function updateModalEditedComment(columnId, value) {
+            modalEditedComments[columnId] = value;
+        }
+        
+        // 切换模态框编辑模式
+        function toggleModalEditMode() {
+            modalEditMode = !modalEditMode;
+            
+            if (modalEditMode) {
+                // 进入编辑模式：保存原始注释
+                modalOriginalComments = {};
+                modalEditedComments = {};
+                const rows = document.querySelectorAll('#detailColumnsList tr');
+                rows.forEach(row => {
+                    const columnId = parseInt(row.dataset.columnId);
+                    if (columnId) {
+                        const commentCell = row.querySelector('td:last-child .comment-display');
+                        if (commentCell) {
+                            const originalComment = commentCell.textContent;
+                            modalOriginalComments[columnId] = originalComment === '-' ? '' : originalComment;
+                        }
+                    }
+                });
+                
+                // 更新UI
+                document.getElementById('modalEditColumnsBtn').style.display = 'none';
+                document.getElementById('modalSaveColumnsBtn').style.display = 'inline-block';
+                document.getElementById('modalCancelEditBtn').style.display = 'inline-block';
+                
+                // 将注释单元格改为输入框
+                rows.forEach(row => {
+                    const columnId = parseInt(row.dataset.columnId);
+                    if (columnId) {
+                        const commentCell = row.querySelector('td:last-child');
+                        const originalComment = modalOriginalComments[columnId] || '';
+                        commentCell.innerHTML = `<input type="text" class="form-control form-control-sm"
+                                       data-column-id="${columnId}"
+                                       value="${originalComment}"
+                                       placeholder="输入注释（留空表示删除）"
+                                       onchange="updateModalEditedComment(${columnId}, this.value)">`;
+                    }
+                });
+            } else {
+                // 退出编辑模式：恢复原始注释
+                document.getElementById('modalEditColumnsBtn').style.display = 'inline-block';
+                document.getElementById('modalSaveColumnsBtn').style.display = 'none';
+                document.getElementById('modalCancelEditBtn').style.display = 'none';
+                
+                // 将输入框改回显示文本
+                const rows = document.querySelectorAll('#detailColumnsList tr');
+                rows.forEach(row => {
+                    const columnId = parseInt(row.dataset.columnId);
+                    if (columnId) {
+                        const commentCell = row.querySelector('td:last-child');
+                        const originalComment = modalOriginalComments[columnId] || '-';
+                        commentCell.innerHTML = `<span class="comment-display">${originalComment}</span>`;
+                    }
+                });
+                
+                modalEditedComments = {};
+                modalOriginalComments = {};
+            }
+        }
+        
+        // 保存模态框中的字段注释
+        async function saveModalColumnComments() {
+            if (Object.keys(modalEditedComments).length === 0) {
+                alert('没有需要保存的注释');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/columns/comments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        comments: modalEditedComments
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(result.message || '注释保存成功！');
+                    
+                    // 保存当前编辑的注释，用于更新显示
+                    const savedComments = { ...modalEditedComments };
+                    
+                    modalEditMode = false;
+                    modalEditedComments = {};
+                    document.getElementById('modalEditColumnsBtn').style.display = 'inline-block';
+                    document.getElementById('modalSaveColumnsBtn').style.display = 'none';
+                    document.getElementById('modalCancelEditBtn').style.display = 'none';
+                    
+                    // 只更新注释显示，不重新加载整个模态框
+                    const rows = document.querySelectorAll('#detailColumnsList tr');
+                    rows.forEach(row => {
+                        const columnId = parseInt(row.dataset.columnId);
+                        if (columnId && savedComments[columnId] !== undefined) {
+                            const commentCell = row.querySelector('td:last-child');
+                            if (commentCell) {
+                                const newComment = savedComments[columnId] || '-';
+                                commentCell.innerHTML = `<span class="comment-display">${newComment}</span>`;
+                            }
+                        }
+                    });
+                    
+                    // 重新加载表列表以更新注释显示
+                    loadTablesPage(currentPage);
+                } else {
+                    alert('保存失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存注释失败:', error);
+                alert('保存注释失败: ' + error.message);
+            }
+        }
+        
+        // 表格搜索过滤功能
+        function filterTables() {
+            const input = document.getElementById("tableSearch");
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById("tablesList");
+            const rows = table.getElementsByTagName("tr");
+ 
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName("td");
+                let found = false;
+                
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j].textContent.toLowerCase().indexOf(filter) > -1) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (found) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+        
+        // 检查用户登录状态
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    modalCurrentUser = userData;
+                    showUserMenu(userData);
+                } else {
+                    modalCurrentUser = null;
+                    showLoginMenu();
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                modalCurrentUser = null;
+                showLoginMenu();
+            }
+        }
+        
+        // 显示用户菜单
+        function showUserMenu(userData) {
+            document.getElementById('usernameDisplay').textContent = userData.full_name || userData.username;
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.remove('d-none');
+            document.getElementById('loginMenu').classList.add('d-none');
+        }
+        
+        // 显示登录菜单
+        function showLoginMenu() {
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.add('d-none');
+            document.getElementById('loginMenu').classList.remove('d-none');
+        }
+        
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    modalCurrentUser = null;
+                    window.location.href = '/';
+                } else {
+                    alert('退出登录失败');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('退出登录失败');
+            }
+        }
+        
+        // 显示用户信息
+        function showUserInfo() {
+            alert('功能开发中：显示用户详细信息');
+        }
+    </script>
+</body>
+</html>

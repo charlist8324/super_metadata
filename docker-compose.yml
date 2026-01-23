@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  metadata-manager:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./metadata.db:/app/metadata.db  # 持久化数据库
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///metadata.db
+      - HOST=0.0.0.0
+      - PORT=5000

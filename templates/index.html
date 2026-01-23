@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item" id="userManageNav">
+                        <a class="nav-link" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 fw-bold mb-3">欢迎使用Super MetaData 元数据管理系统</h1>
+                <p class="lead text-muted">一站式元数据管理平台，轻松掌控您的数据资产</p>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-5">
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 border-0 shadow-sm text-center feature-card">
+                    <div class="card-body p-4">
+                        <div class="icon-container mx-auto mb-3">
+                            <i class="fas fa-database fa-2x text-primary"></i>
+                        </div>
+                        <h5 class="card-title">数据源管理</h5>
+                        <p class="card-text text-muted">支持多种数据库类型，集中管理数据源连接</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 border-0 shadow-sm text-center feature-card">
+                    <div class="card-body p-4">
+                        <div class="icon-container mx-auto mb-3">
+                            <i class="fas fa-table fa-2x text-success"></i>
+                        </div>
+                        <h5 class="card-title">元数据抽取</h5>
+                        <p class="card-text text-muted">自动抽取表结构、字段信息和统计信息</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 border-0 shadow-sm text-center feature-card">
+                    <div class="card-body p-4">
+                        <div class="icon-container mx-auto mb-3">
+                            <i class="fas fa-chart-bar fa-2x text-info"></i>
+                        </div>
+                        <h5 class="card-title">数据分析</h5>
+                        <p class="card-text text-muted">统计表行数、数据量等关键指标</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 border-0 shadow-sm text-center feature-card">
+                    <div class="card-body p-4">
+                        <div class="icon-container mx-auto mb-3">
+                            <i class="fas fa-history fa-2x text-warning"></i>
+                        </div>
+                        <h5 class="card-title">历史追踪</h5>
+                        <p class="card-text text-muted">完整记录抽取历史和变更轨迹</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="fas fa-star text-warning me-2"></i>
+                            系统特色
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0 me-3">
+                                        <i class="fas fa-check-circle text-success fa-2x"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">多数据库支持</h6>
+                                        <p class="text-muted mb-0">支持 MySQL、PostgreSQL、SQL Server、Oracle、Starrocks/Doris 等主流数据库</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0 me-3">
+                                        <i class="fas fa-check-circle text-success fa-2x"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">可视化界面</h6>
+                                        <p class="text-muted mb-0">直观的 Web 界面，轻松管理元数据</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0 me-3">
+                                        <i class="fas fa-check-circle text-success fa-2x"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">实时统计</h6>
+                                        <p class="text-muted mb-0">自动计算表行数、数据量等统计信息</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0 me-3">
+                                        <i class="fas fa-check-circle text-success fa-2x"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">历史追踪</h6>
+                                        <p class="text-muted mb-0">完整记录每次元数据抽取的历史和状态</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="fas fa-rocket text-primary me-2"></i>
+                            快速开始
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-3">
+                            <a href="/dashboard" class="btn btn-primary btn-lg">
+                                <i class="fas fa-dashboard me-2"></i>进入仪表板
+                            </a>
+                            <a href="/data-sources" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-plus-circle me-2"></i>添加数据源
+                            </a>
+                            <a href="/metadata" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-eye me-2"></i>浏览元数据
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer bg-light mt-5 py-4">
+        <div class="container-xl">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="mb-3">Super MetaData 元数据管理系统</h6>
+                    <p class="text-muted small">一站式元数据管理解决方案，助力企业数据治理</p>
+                </div>
+                 <div class="col-md-6">
+                    <h6 class="mb-3">联系我们</h6>
+                    <p class="text-muted small">
+                        <i class="fas fa-envelope me-2"></i>changchunyouxiang@qq.com<br>
+                        <i class="fas fa-code me-2"></i>Version 1.0.0
+                    </p>
+                </div>
+            </div>
+            <hr>
+            <div class="text-center text-muted small">
+                2026 Super MetaData 元数据管理系统 纯AI打造
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // 检查用户登录状态
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    showUserMenu(userData);
+                } else {
+                    showLoginMenu();
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                showLoginMenu();
+            }
+        }
+        
+        // 显示用户菜单
+        function showUserMenu(userData) {
+            document.getElementById('usernameDisplay').textContent = userData.full_name || userData.username;
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.remove('d-none');
+            document.getElementById('loginMenu').classList.add('d-none');
+        }
+        
+        // 显示登录菜单
+        function showLoginMenu() {
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.add('d-none');
+            document.getElementById('loginMenu').classList.remove('d-none');
+        }
+        
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('退出登录失败');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('退出登录失败');
+            }
+        }
+        
+        // 显示用户信息
+        function showUserInfo() {
+            alert('功能开发中：显示用户详细信息');
+        }
+        
+        // 页面加载完成后检查认证状态
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+        });
+    </script>
+</body>
+</html>

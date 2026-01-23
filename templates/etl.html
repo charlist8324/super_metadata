@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL任务管理 - Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item" id="userManageNav">
+                        <a class="nav-link" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">ETL任务管理</h1>
+                        <p class="text-muted mb-0">管理和调度元数据抽取任务</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addETLTaskModal">
+                            <i class="fas fa-plus me-1"></i>添加任务
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks text-info me-2"></i>
+                            ETL任务列表
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm w-auto">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="taskSearch" placeholder="搜索任务..." onkeyup="filterTasks()">
+                            </div>
+                            <select class="form-select form-select-sm" id="statusFilter" onchange="filterTasks()">
+                                <option value="">全部状态</option>
+                                <option value="active">启用</option>
+                                <option value="inactive">禁用</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="etlTasksTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>任务名称</th>
+                                        <th>数据源</th>
+                                        <th>调度规则</th>
+                                        <th>状态</th>
+                                        <th>上次运行</th>
+                                        <th>下次运行</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tasksList">
+                                    <!-- 动态加载任务列表 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle text-primary me-2"></i>
+                            任务说明
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold">ETL任务类型</h6>
+                        <ul class="mb-4">
+                            <li><strong>全量抽取</strong>：抽取数据源中的所有表元数据</li>
+                            <li><strong>增量抽取</strong>：仅抽取新增或变更的表元数据</li>
+                            <li><strong>定时抽取</strong>：按预设时间间隔自动抽取</li>
+                        </ul>
+                        
+                        <h6 class="fw-bold">调度规则</h6>
+                        <ul class="mb-4">
+                            <li><strong>CRON表达式</strong>：支持标准CRON格式</li>
+                            <li><strong>频率</strong>：每日、每周、每月等</li>
+                            <li><strong>时间点</strong>：具体执行时间</li>
+                        </ul>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            建议为大型数据源设置非高峰时段执行，避免影响业务系统性能。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加/编辑ETL任务模态框 -->
+        <div class="modal fade" id="addETLTaskModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="modalTitle">
+                            <i class="fas fa-plus-circle me-2"></i>
+                            <span>添加ETL任务</span>
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="etlTaskForm">
+                            <input type="hidden" id="taskId">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="taskName" class="form-label fw-semibold">任务名称 <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="taskName" placeholder="请输入任务名称" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="taskType" class="form-label fw-semibold">任务类型 <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="taskType" required>
+                                            <option value="">请选择任务类型</option>
+                                            <option value="full">全量抽取</option>
+                                            <option value="incremental">增量抽取</option>
+                                            <option value="schema_only">仅结构抽取</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="dataSource" class="form-label fw-semibold">数据源 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="dataSource" required>
+                                    <option value="">请选择数据源</option>
+                                    <!-- 动态加载数据源选项 -->
+                                </select>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="scheduleType" class="form-label fw-semibold">调度类型 <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="scheduleType" required onchange="toggleScheduleFields()">
+                                            <option value="">请选择调度类型</option>
+                                            <option value="interval">时间间隔</option>
+                                            <option value="cron">CRON表达式</option>
+                                            <option value="manual">手动执行</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="taskStatus" class="form-label fw-semibold">任务状态 <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="taskStatus" required>
+                                            <option value="active">启用</option>
+                                            <option value="inactive">禁用</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="intervalFields" style="display: none;">
+                                <label for="intervalValue" class="form-label fw-semibold">执行间隔</label>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <input type="number" class="form-control" id="intervalValue" placeholder="数值" min="1">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <select class="form-select" id="intervalUnit">
+                                            <option value="minutes">分钟</option>
+                                            <option value="hours">小时</option>
+                                            <option value="days">天</option>
+                                            <option value="weeks">周</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="cronFields" style="display: none;">
+                                <label for="cronExpression" class="form-label fw-semibold">CRON表达式</label>
+                                <input type="text" class="form-control" id="cronExpression" placeholder="例如: 0 2 * * *">
+                                <div class="form-text">
+                                    格式: 分 时 日 月 周 (秒可选)
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label fw-semibold">任务描述</label>
+                                <textarea class="form-control" id="description" rows="3" placeholder="请输入任务描述"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>取消
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="saveETLTask()">
+                            <i class="fas fa-save me-1"></i>保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // 页面加载完成后获取ETL任务列表
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus().then(() => {
+                loadETLTasks();
+                loadDataSourcesForETL();
+            });
+            
+            // 添加状态筛选器事件监听
+            document.getElementById('statusFilter').addEventListener('change', function() {
+                loadETLTasks();
+            });
+        });
+
+        // 切换调度字段显示
+        function toggleScheduleFields() {
+            const scheduleType = document.getElementById('scheduleType').value;
+            document.getElementById('intervalFields').style.display = 'none';
+            document.getElementById('cronFields').style.display = 'none';
+            
+            if (scheduleType === 'interval') {
+                document.getElementById('intervalFields').style.display = 'block';
+            } else if (scheduleType === 'cron') {
+                document.getElementById('cronFields').style.display = 'block';
+            }
+        }
+
+        // 加载ETL任务列表
+        async function loadETLTasks() {
+            try {
+                const tbody = document.getElementById('tasksList');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></td></tr>';
+                
+                // 从状态筛选器获取筛选条件
+                const statusFilter = document.getElementById('statusFilter').value;
+                
+                // 构建请求URL
+                let url = '/api/etl-tasks';
+                if (statusFilter) {
+                    url += `?status=${statusFilter}`;
+                }
+                
+                // 从数据库加载任务数据
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('加载ETL任务失败');
+                }
+                const tasks = await response.json();
+                
+                tbody.innerHTML = '';
+                
+                if (tasks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">暂无ETL任务，请点击“添加任务”创建新任务</td></tr>';
+                    return;
+                }
+                
+                tasks.forEach(task => {
+                    const row = document.createElement('tr');
+                    
+                    // 根据状态设置不同样式
+                    let statusHtml = '';
+                    if (task.status === 'active') {
+                        statusHtml = `<span class="badge bg-success">启用</span>`;
+                    } else {
+                        statusHtml = `<span class="badge bg-secondary">禁用</span>`;
+                    }
+                    
+                    // 调度规则显示
+                    let scheduleDisplay = '';
+                    if (task.schedule_type === 'cron') {
+                        scheduleDisplay = task.cron_expression || '-';
+                    } else if (task.schedule_type === 'interval') {
+                        scheduleDisplay = `每${task.interval_value}${getIntervalUnitText(task.interval_unit)}`;
+                    } else {
+                        scheduleDisplay = '手动执行';
+                    }
+                    
+                    row.innerHTML = `
+                        <td>${task.id}</td>
+                        <td>${task.name}</td>
+                        <td>${task.datasource_name || '-'}</td>
+                        <td>${scheduleDisplay}</td>
+                        <td>${statusHtml}</td>
+                         <td>${task.last_run ? new Date(task.last_run).toLocaleString() : '-'}</td>
+                        <td>${task.next_run ? new Date(task.next_run).toLocaleString() : '-'}</td>
+                        <td class="operations">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editETLTask(${task.id})" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteETLTask(${task.id})" title="删除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="executeETLTask(${task.id})" title="执行">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('加载ETL任务失败:', error);
+                const tbody = document.getElementById('tasksList');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">加载ETL任务失败: ${error.message}</td></tr>`;
+                }
+            }
+        }
+        
+        // 获取时间间隔单位文本
+        function getIntervalUnitText(unit) {
+            const units = {
+                'minutes': '分钟',
+                'hours': '小时',
+                'days': '天',
+                'weeks': '周'
+            };
+            return units[unit] || unit;
+        }
+
+        // 加载数据源用于ETL任务
+        async function loadDataSourcesForETL() {
+            try {
+                const response = await fetch('/api/data-sources');
+                const dataSources = await response.json();
+                
+                const select = document.getElementById('dataSource');
+                if (!select) return;
+                
+                select.innerHTML = '<option value="">请选择数据源</option>';
+                
+                dataSources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source.id;
+                    option.textContent = `${source.name} (${source.type.toUpperCase()})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('加载数据源失败:', error);
+            }
+        }
+
+        // 编辑ETL任务
+        async function editETLTask(id) {
+            try {
+                const response = await fetch(`/api/etl-tasks/${id}`);
+                if (!response.ok) {
+                    throw new Error('获取任务信息失败');
+                }
+                const task = await response.json();
+                
+                document.getElementById('taskId').value = task.id;
+                document.getElementById('taskName').value = task.name;
+                document.getElementById('taskType').value = task.task_type;
+                document.getElementById('dataSource').value = task.datasource_id;
+                document.getElementById('scheduleType').value = task.schedule_type;
+                document.getElementById('taskStatus').value = task.status;
+                document.getElementById('description').value = task.description || '';
+                
+                if (task.schedule_type === 'cron') {
+                    document.getElementById('cronExpression').value = task.cron_expression || '';
+                } else if (task.schedule_type === 'interval') {
+                    document.getElementById('intervalValue').value = task.interval_value || '';
+                    document.getElementById('intervalUnit').value = task.interval_unit || 'hours';
+                }
+                
+                document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i><span>编辑ETL任务</span>';
+                
+                // 显示相应的调度字段
+                toggleScheduleFields();
+                
+                const modal = new bootstrap.Modal(document.getElementById('addETLTaskModal'));
+                modal.show();
+            } catch (error) {
+                console.error('获取ETL任务信息失败:', error);
+                alert('获取ETL任务信息失败: ' + error.message);
+            }
+        }
+
+        // 删除ETL任务
+        async function deleteETLTask(id) {
+            if (!confirm('确定要删除这个ETL任务吗？此操作不可恢复！')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/etl-tasks/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('ETL任务删除成功！');
+                    loadETLTasks(); // 刷新列表
+                } else {
+                    const result = await response.json();
+                    alert('删除失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('删除ETL任务失败:', error);
+                alert('删除ETL任务失败: ' + error.message);
+            }
+        }
+
+        // 保存ETL任务
+        async function saveETLTask() {
+            const id = document.getElementById('taskId').value;
+            const name = document.getElementById('taskName').value;
+            const taskType = document.getElementById('taskType').value;
+            const datasourceId = document.getElementById('dataSource').value;
+            const scheduleType = document.getElementById('scheduleType').value;
+            const status = document.getElementById('taskStatus').value;
+            const description = document.getElementById('description').value;
+            
+            if (!name || !taskType || !datasourceId || !scheduleType) {
+                alert('请填写所有必填字段');
+                return;
+            }
+            
+            try {
+                // 构建任务数据
+                const taskData = {
+                    name: name,
+                    task_type: taskType,
+                    datasource_id: parseInt(datasourceId),
+                    schedule_type: scheduleType,
+                    status: status,
+                    description: description
+                };
+                
+                // 根据调度类型添加相应字段
+                if (scheduleType === 'interval') {
+                    taskData.interval_value = parseInt(document.getElementById('intervalValue').value);
+                    taskData.interval_unit = document.getElementById('intervalUnit').value;
+                } else if (scheduleType === 'cron') {
+                    taskData.cron_expression = document.getElementById('cronExpression').value;
+                }
+                
+                const method = id ? 'PUT' : 'POST';
+                const url = id ? `/api/etl-tasks/${id}` : '/api/etl-tasks';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(taskData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(result.message || (id ? 'ETL任务更新成功！' : 'ETL任务添加成功！'));
+                    
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addETLTaskModal'));
+                    modal.hide();
+                    
+                    // 清空表单
+                    document.getElementById('etlTaskForm').reset();
+                    document.getElementById('taskId').value = '';
+                    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i><span>添加ETL任务</span>';
+                    document.getElementById('intervalFields').style.display = 'none';
+                    document.getElementById('cronFields').style.display = 'none';
+                    
+                    // 刷新列表
+                    loadETLTasks();
+                } else {
+                    alert('保存失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存ETL任务失败:', error);
+                alert('保存ETL任务失败: ' + error.message);
+            }
+        }
+
+        // 执行ETL任务
+        async function executeETLTask(id) {
+            if (!confirm('确定要立即执行这个ETL任务吗？这将抽取元数据，可能需要一些时间。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/etl-tasks/${id}/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    if (result.success) {
+                        alert(result.message || 'ETL任务执行成功！');
+                        loadETLTasks(); // 刷新列表以更新执行时间
+                    } else {
+                        alert('执行失败: ' + (result.message || '未知错误'));
+                    }
+                } else {
+                    alert('执行失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('执行ETL任务失败:', error);
+                alert('执行ETL任务失败: ' + error.message);
+            }
+        }
+
+        // 任务搜索过滤功能
+        function filterTasks() {
+            const input = document.getElementById("taskSearch");
+            const statusFilter = document.getElementById("statusFilter");
+            const filter = input.value.toLowerCase();
+            const statusFilterValue = statusFilter.value;
+            const table = document.getElementById("etlTasksTable");
+            const rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName("td");
+                let showRow = true;
+                
+                // 检查搜索关键词
+                if (filter) {
+                    let found = false;
+                    for (let j = 0; j < cells.length - 1; j++) { // 不搜索操作列
+                        if (cells[j].textContent.toLowerCase().indexOf(filter) > -1) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        showRow = false;
+                    }
+                }
+                
+                // 检查状态筛选（第5列是状态列）
+                if (showRow && statusFilterValue) {
+                    const statusCell = cells[4]; // 状态列
+                    let statusText = statusCell.textContent.toLowerCase();
+                    let statusMatch = false;
+                    
+                    if (statusFilterValue === 'active' && statusText.includes('启用')) {
+                        statusMatch = true;
+                    } else if (statusFilterValue === 'inactive' && statusText.includes('禁用')) {
+                        statusMatch = true;
+                    }
+                    
+                    if (!statusMatch) {
+                        showRow = false;
+                    }
+                }
+                
+                rows[i].style.display = showRow ? "" : "none";
+            }
+        }
+        
+        // 检查用户登录状态
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    showUserMenu(userData);
+                    return true;
+                } else {
+                    showLoginMenu();
+                    return false;
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                showLoginMenu();
+                return false;
+            }
+        }
+        
+        // 显示用户菜单
+        function showUserMenu(userData) {
+            document.getElementById('usernameDisplay').textContent = userData.full_name || userData.username;
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.remove('d-none');
+            document.getElementById('loginMenu').classList.add('d-none');
+        }
+        
+        // 显示登录菜单
+        function showLoginMenu() {
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.add('d-none');
+            document.getElementById('loginMenu').classList.remove('d-none');
+        }
+        
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('退出登录失败');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('退出登录失败');
+            }
+        }
+        
+        // 显示用户信息
+        function showUserInfo() {
+            alert('功能开发中：显示用户详细信息');
+        }
+    </script>
+</body>
+</html>

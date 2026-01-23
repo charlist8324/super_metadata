@@ -1,0 +1,1 @@
+C:\Python314\python.exe D:\python\py_opencode\metadata_manager\app.py

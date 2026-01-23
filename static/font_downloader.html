@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Font Awesome 字体下载助手</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .download-link {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .download-link:hover {
+            background: #0056b3;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Font Awesome 字体下载助手</h1>
+
+    <p>您的系统缺少 Font Awesome 字体文件，导致图标无法显示。请按照以下步骤下载并安装字体文件。</p>
+
+    <div class="step">
+        <h2>步骤 1：下载字体文件</h2>
+        <p>点击下方链接下载 Font Awesome 6.0.0 Web 版本：</p>
+        <a href="https://use.fontawesome.com/releases/v6.0.0/fontawesome-free-6.0.0-web.zip" class="download-link" download>点击下载字体包 (约 12MB)</a>
+        <br><br>
+        <p>或者从 GitHub 下载：</p>
+        <a href="https://github.com/FortAwesome/Font-Awesome/releases/download/6.0.0/fontawesome-free-6.0.0-web.zip" class="download-link" download>GitHub 下载链接</a>
+    </div>
+
+    <div class="step">
+        <h2>步骤 2：解压文件</h2>
+        <p>下载完成后，解压 <code>fontawesome-free-6.0.0-web.zip</code> 文件。</p>
+    </div>
+
+    <div class="step">
+        <h2>步骤 3：复制字体文件</h2>
+        <p>在解压后的文件夹中，找到 <code>webfonts/</code> 目录，将以下文件复制到：</p>
+        <div class="code">D:\python\py_opencode\metadata_manager\static\libs\fontawesome\webfonts\</div>
+
+        <p><strong>需要复制的文件：</strong></p>
+        <ul>
+            <li>fa-solid-900.woff2</li>
+            <li>fa-regular-400.woff2</li>
+            <li>fa-brands-400.woff2</li>
+            <li>fa-v4compatibility.ttf</li>
+        </ul>
+
+        <p>或者直接复制整个 <code>webfonts/</code> 目录的内容。</p>
+    </div>
+
+    <div class="step">
+        <h2>步骤 4：验证</h2>
+        <p>复制完成后，检查目录应该包含：</p>
+        <div class="code">
+            static/libs/fontawesome/webfonts/<br>
+            ├── fa-solid-900.woff2<br>
+            ├── fa-regular-400.woff2<br>
+            ├── fa-brands-400.woff2<br>
+            └── fa-v4compatibility.ttf
+        </div>
+    </div>
+
+    <div class="step">
+        <h2>步骤 5：刷新浏览器</h2>
+        <p>刷新浏览器页面，图标应该正常显示了。如果还是没有，请清除浏览器缓存（Ctrl+Shift+Delete）。</p>
+    </div>
+
+    <div class="step">
+        <h2>📁 当前目录结构</h2>
+        <div class="code">
+            D:\python\py_opencode\metadata_manager\static\libs\fontawesome\<br>
+            ├── css/<br>
+            │   └── all.min.css  ✅ 已下载<br>
+            └── webfonts/<br>
+                └── (空，需要您复制文件)
+        </div>
+    </div>
+
+    <div class="step" style="background: #fff3cd; border-left-color: #ffc107;">
+        <h2>💡 提示</h2>
+        <ul>
+            <li>下载链接可能需要翻墙或等待较长时间</li>
+            <li>如果下载失败，可以尝试在浏览器中复制下载链接手动下载</li>
+            <li>字体文件约 12MB，包含所有图标</li>
+            <li>复制文件后，不需要重启服务器，直接刷新浏览器即可</li>
+        </ul>
+    </div>
+
+    <div class="step" style="background: #d4edda; border-left-color: #28a745;">
+        <h2>✅ 验证是否成功</h2>
+        <p>完成上述步骤后，访问 http://localhost:5000，应该能看到：</p>
+        <ul>
+            <li>用户头像图标（右上角）</li>
+            <li>导航菜单图标</li>
+            <li>按钮图标（添加、编辑、删除等）</li>
+        </ul>
+        <p>如果图标都正常显示，说明字体文件已成功安装！</p>
+    </div>
+
+    <hr>
+    <p style="text-align: center; color: #6c757d;">
+        详细说明请查看：<a href="DOWNLOAD_FONTS.md">DOWNLOAD_FONTS.md</a>
+    </p>
+
+    <script>
+        // 检测本地目录
+        function checkWebfontsDir() {
+            const checkDiv = document.createElement('div');
+            document.body.appendChild(checkDiv);
+
+            // 尝试加载一个字体文件
+            fetch('/static/libs/fontawesome/webfonts/fa-solid-900.woff2')
+                .then(response => {
+                    if (response.ok) {
+                        const statusDiv = document.createElement('div');
+                        statusDiv.innerHTML = '<div class="step" style="background: #d4edda; border-left-color: #28a745;"><h2>✅ 字体文件已存在！</h2><p>您的系统已经包含字体文件，应该可以正常显示图标了。如果图标还是不显示，请刷新浏览器页面。</p></div>';
+                        document.body.insertBefore(statusDiv, document.body.firstChild);
+                    }
+                })
+                .catch(() => {
+                    // 字体文件不存在
+                });
+        }
+
+        // 页面加载时检查
+        window.addEventListener('load', checkWebfontsDir);
+    </script>
+</body>
+</html>

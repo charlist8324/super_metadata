@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抽取历史 - Super MetaData 元数据管理系统</title>
+    <link href="{{ url_for('static', filename='libs/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome/css/all.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-database me-2"></i>
+                <span class="fw-bold">Super MetaData 元数据管理系统</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto" id="mainNavMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-chart-line me-1"></i>资源概览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/etl">
+                            <i class="fas fa-sync-alt me-1"></i>ETL任务
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/data-sources">
+                            <i class="fas fa-server me-1"></i>数据源管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/metadata">
+                            <i class="fas fa-table me-1"></i>元数据浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/history">
+                            <i class="fas fa-history me-1"></i>抽取历史
+                        </a>
+                    </li>
+                    <li class="nav-item" id="userManageNav">
+                        <a class="nav-link" href="/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto d-none" id="userMenu">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay">用户名</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showUserInfo()">
+                                <i class="fas fa-user-circle me-2"></i>个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto" id="loginMenu">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-xl mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">抽取历史</h1>
+                        <p class="text-muted mb-0">元数据抽取操作的历史记录</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary" onclick="loadHistory(currentPage)">
+                            <i class="fas fa-sync-alt me-1"></i>刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock text-info me-2"></i>
+                            历史记录
+                        </h5>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <div class="input-group input-group-sm w-auto">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="historySearch" placeholder="搜索数据源..." onkeyup="filterHistory()">
+                            </div>
+                            <select class="form-select form-select-sm" id="historyDataSourceFilter" onchange="filterHistory()">
+                                <option value="">全部数据源</option>
+                                <!-- 动态加载数据源选项 -->
+                            </select>
+                            <select class="form-select form-select-sm" id="historyStatusFilter" onchange="filterHistory()">
+                                <option value="">全部状态</option>
+                                <option value="running">执行中</option>
+                                <option value="success">成功</option>
+                                <option value="failed">失败</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="historyTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>数据源</th>
+                                        <th>抽取时间</th>
+                                        <th>状态</th>
+                                        <th>抽取表数</th>
+                                        <th>耗时</th>
+                                        <th>日志/错误信息</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- 动态加载历史记录 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <nav aria-label="历史记录分页" id="paginationNav" class="mt-4" style="display: none;">
+            <ul class="pagination justify-content-center" id="paginationList">
+                <!-- 分页控件 -->
+            </ul>
+        </nav>
+    </div>
+
+    <script src="{{ url_for('static', filename='libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let currentPage = 1;
+        let totalPages = 0;
+        
+        // 页面加载完成后获取抽取历史
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            loadHistory(currentPage);
+            loadDataSourcesForFilter();
+            
+            // 添加筛选事件监听器
+            document.getElementById('historyDataSourceFilter').addEventListener('change', function() {
+                currentPage = 1;
+                loadHistory(currentPage);
+            });
+            
+            document.getElementById('historyStatusFilter').addEventListener('change', function() {
+                currentPage = 1;
+                loadHistory(currentPage);
+            });
+        });
+        
+        // 加载抽取历史
+        async function loadHistory(page) {
+            const dataSourceFilter = document.getElementById('historyDataSourceFilter').value;
+            const statusFilter = document.getElementById('historyStatusFilter').value;
+            const pageSize = 10;
+
+            const tbody = document.querySelector('#historyTable tbody');
+            if (!tbody) return;
+
+            try {
+                // 显示加载状态
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></td></tr>';
+
+                let url = `/api/extraction-history?page=${page}&per_page=${pageSize}`;
+                if (dataSourceFilter) {
+                    url += `&datasource_id=${dataSourceFilter}`;
+                }
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                const history = result.history;
+                totalPages = result.pagination.pages;
+
+                tbody.innerHTML = '';
+
+                history.forEach(record => {
+                    const row = document.createElement('tr');
+
+                    // 根据状态设置不同样式
+                    let statusHtml = '';
+                    if (record.status === 'success') {
+                        statusHtml = `<span class="badge bg-success">成功</span>`;
+                    } else if (record.status === 'running') {
+                        statusHtml = `<span class="badge bg-primary">执行中</span>`;
+                    } else if (record.status === 'failed') {
+                        statusHtml = `<span class="badge bg-danger">失败</span>`;
+                    } else {
+                        statusHtml = `<span class="badge bg-secondary">${record.status}</span>`;
+                    }
+
+                    // 格式化抽取时间为北京时间
+                    const extractionTime = record.extraction_time_readable || '-';
+
+                    // 格式化耗时
+                    const duration = record.duration ? formatDuration(record.duration) : '-';
+
+                    // 格式化日志信息
+                    let messageHtml = '';
+                    if (record.message) {
+                        const messageText = record.message;
+                        const shortMessage = messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText;
+                        messageHtml = `<span class="text-truncate d-inline-block" style="max-width: 300px;" title="${messageText}">${shortMessage}</span>`;
+                    } else {
+                        messageHtml = '-';
+                    }
+
+                    row.innerHTML = `
+                        <td>${record.id}</td>
+                        <td>${record.datasource_name}</td>
+                        <td>${extractionTime}</td>
+                        <td>${statusHtml}</td>
+                        <td>${record.extracted_tables}</td>
+                        <td>${duration}</td>
+                        <td>${messageHtml}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                // 更新分页控件
+                updatePagination(page, totalPages);
+            } catch (error) {
+                console.error('加载抽取历史失败:', error);
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">加载抽取历史失败: ${error.message}</td></tr>`;
+            }
+        }
+        
+        // 加载数据源用于筛选
+        async function loadDataSourcesForFilter() {
+            try {
+                const response = await fetch('/api/data-sources');
+                const dataSources = await response.json();
+                
+                const select = document.getElementById('historyDataSourceFilter');
+                if (!select) return;
+                
+                select.innerHTML = '<option value="">全部数据源</option>';
+                
+                dataSources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source.id;
+                    option.textContent = `${source.name} (${source.type.toUpperCase()})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('加载数据源失败:', error);
+            }
+        }
+        
+        // 更新分页控件
+        function updatePagination(page, totalPages) {
+            const paginationNav = document.getElementById('paginationNav');
+            const paginationList = document.getElementById('paginationList');
+             
+            if (!paginationList) return;
+             
+            paginationList.innerHTML = '';
+             
+            if (totalPages <= 1) {
+                paginationNav.style.display = 'none';
+                return;
+            }
+             
+            paginationNav.style.display = 'block';
+             
+            // 上一页按钮
+            if (page > 1) {
+                const prevLi = document.createElement('li');
+                prevLi.className = 'page-item';
+                prevLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${page - 1})">上一页</a>`;
+                paginationList.appendChild(prevLi);
+            } else {
+                const prevLi = document.createElement('li');
+                prevLi.className = 'page-item disabled';
+                prevLi.innerHTML = `<span class="page-link">上一页</span>`;
+                paginationList.appendChild(prevLi);
+            }
+             
+            // 页码按钮
+            const startPage = Math.max(1, page - 2);
+            const endPage = Math.min(totalPages, page + 2);
+             
+            for (let i = startPage; i <= endPage; i++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = i === page ? 'page-item active' : 'page-item';
+                pageLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>`;
+                paginationList.appendChild(pageLi);
+            }
+             
+            // 下一页按钮
+            if (page < totalPages) {
+                const nextLi = document.createElement('li');
+                nextLi.className = 'page-item';
+                nextLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${page + 1})">下一页</a>`;
+                paginationList.appendChild(nextLi);
+            } else {
+                const nextLi = document.createElement('li');
+                nextLi.className = 'page-item disabled';
+                nextLi.innerHTML = `<span class="page-link">下一页</span>`;
+                paginationList.appendChild(nextLi);
+            }
+        }
+        
+        // 跳转到指定页面
+        function goToPage(page) {
+            currentPage = page;
+            loadHistory(page);
+             
+            // 滚动到表格顶部
+            document.querySelector('#historyTable').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 格式化耗时（秒）
+        function formatDuration(seconds) {
+            if (!seconds || seconds === 0) return '-';
+            
+            if (seconds < 60) {
+                return `${seconds}秒`;
+            } else if (seconds < 3600) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return remainingSeconds > 0 ? `${minutes}分${remainingSeconds}秒` : `${minutes}分钟`;
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const remainingMinutes = Math.floor((seconds % 3600) / 60);
+                return remainingMinutes > 0 ? `${hours}小时${remainingMinutes}分` : `${hours}小时`;
+            }
+        }
+        
+        // 历史记录搜索过滤功能
+        function filterHistory() {
+            const searchInput = document.getElementById("historySearch");
+            const dataSourceFilter = document.getElementById("historyDataSourceFilter");
+            const statusFilter = document.getElementById("historyStatusFilter");
+            const searchFilter = searchInput.value.toLowerCase();
+            const dataSourceFilterValue = dataSourceFilter.value;
+            const statusFilterValue = statusFilter.value;
+            const table = document.getElementById("historyTable");
+            const rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName("td");
+                const datasourceCell = cells[1]; // 数据源列
+                const statusCell = cells[3]; // 状态列
+                
+                let showRow = true;
+                
+                // 检查搜索关键词
+                if (searchFilter && datasourceCell.textContent.toLowerCase().indexOf(searchFilter) === -1) {
+                    showRow = false;
+                }
+                
+                // 检查数据源筛选
+                if (dataSourceFilterValue && datasourceCell.textContent.toLowerCase().indexOf(dataSourceFilterValue) === -1) {
+                    showRow = false;
+                }
+                
+                // 检查状态筛选
+                if (statusFilterValue && !statusCell.textContent.includes(statusFilterValue)) {
+                    showRow = false;
+                }
+                
+                rows[i].style.display = showRow ? "" : "none";
+            }
+        }
+        
+        // 检查用户登录状态
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    showUserMenu(userData);
+                } else {
+                    showLoginMenu();
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                showLoginMenu();
+            }
+        }
+        
+        // 显示用户菜单
+        function showUserMenu(userData) {
+            document.getElementById('usernameDisplay').textContent = userData.full_name || userData.username;
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.remove('d-none');
+            document.getElementById('loginMenu').classList.add('d-none');
+        }
+        
+        // 显示登录菜单
+        function showLoginMenu() {
+            document.getElementById('mainNavMenu').classList.remove('d-none');
+            document.getElementById('userMenu').classList.add('d-none');
+            document.getElementById('loginMenu').classList.remove('d-none');
+        }
+        
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    alert('退出登录失败');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('退出登录失败');
+            }
+        }
+        
+        // 显示用户信息
+        function showUserInfo() {
+            alert('功能开发中：显示用户详细信息');
+        }
+    </script>
+</body>
+</html>
